@@ -88,7 +88,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 
 ### 5.6 Configuration
 
-- FR24: Settings live in the plugin's entry in `~/.config/omarchy/shell.json`, inline on the entry, per the Omarchy plugin storage rules:
+- FR24: Settings live in the plugin's single entry in `~/.config/omarchy/shell.json`, inline on the entry, per the Omarchy plugin storage rules. Because this plugin is both a service and a bar widget, that entry sits in `bar.layout.<section>` while the widget is on the bar and in `plugins[]` when it is not; the settings move with it, and the service reads whichever holds it:
 
 ```json
 {
@@ -119,7 +119,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 - FR31: The plugin ships a bar widget showing the time remaining until the next break. It refreshes once per minute above a minute, and once per second below it.
 - FR32: The widget renders the current state distinctly: counting down, deferred by fullscreen, suspended by idle, or paused by the user.
 - FR33: Clicking the widget takes a break immediately. It is also the affordance for pause and resume.
-- FR34: The widget is a view, not a second source of truth. It reads state from the resident service through `shell.serviceFor("camilo.restreminder")`; settings stay only on the `plugins[]` entry and are never duplicated into the widget's bar layout entry.
+- FR34: The widget is a view, not a second source of truth. It reads state from the resident service through `shell.serviceFor("camilo.restreminder")` and holds no timer or settings of its own. There is one entry in shell.json, never two.
 - FR35: The manifest sets `barWidget.defaultSection`, so enabling the plugin places the widget on the bar automatically. No manual `omarchy bar move` is needed to see it.
 - FR36: The widget is optional. Removing it from the bar must not stop the timer or affect breaks in any way.
 
@@ -135,14 +135,16 @@ Omarchy 4 runs one long-lived Quickshell process (`omarchy-shell`) that hosts ev
 - The service exposes control through its own `IpcHandler` with `target: "restreminder"`, the same pattern the lock service (`target: "lock"`) and the bar (`target: "omarchy.bar"`) use. This is required rather than cosmetic: the generic `omarchy-shell shell call <id> <method>` only reaches panel, overlay and menu loaders, never services, so a service with no IPC target of its own is unreachable from the CLI.
 - The overlay is a layer-shell window on the overlay layer with exclusive keyboard focus, instantiated once per screen (`Variants` over `Quickshell.screens`) so multi-monitor is covered by construction.
 - The pre-break warning is a separate, non-focusing surface on the same overlay layer, or a plain notification through `omarchy-notification-send`. Decide during Milestone 3 based on how it reads in practice.
-- Idle detection reuses Quickshell's `IdleMonitor` with `respectInhibitors: true`, the same primitive `omarchy.idle` already uses, with `timeout` set to `idlePauseMinutes`. Its `isIdle` transitions are the suspend and restart signals for the work timer.
-- Fullscreen detection comes from Hyprland through `Quickshell.Hyprland` (the workspace `hasfullscreen` state and the `fullscreen` event). No first-party Omarchy plugin reads this today, so the exact property is to be confirmed against the Quickshell API in Milestone 4; the `hyprctl -j workspaces` field is the fallback.
+- Idle detection reuses Quickshell's `IdleMonitor` with `respectInhibitors: true`, the same primitive `omarchy.idle` already uses, with `timeout` set to `idlePauseMinutes`. Its `isIdle` transitions are the suspend and restart signals for the work timer. `IdleMonitor` reads `timeout` when it registers and ignores a binding that resolves later, so the monitor is created imperatively with the timeout as an initial property and rebuilt when the threshold changes; bound to a config value it silently never reports idle.
+- Wayland exposes no way to ask whether another client holds an idle inhibitor. Two `IdleMonitor`s on the same timeout, one respecting inhibitors and one not, answer it by disagreeing: input has stopped but only the inhibitor-blind one reports idle. This detects the case that matters (a player or call running while the user is not typing) and deliberately does not fire while the user is actively typing, when a break is legitimate.
+- Fullscreen detection comes from Hyprland through `Quickshell.Hyprland`: `Hyprland.focusedWorkspace.hasFullscreen`, which is a bindable property with a change signal. No first-party Omarchy plugin reads it today.
 - Config is read from `shell.shellConfig` (the shell injects itself into every plugin instance) and re-read on change.
 - Reference implementations to follow in-tree: `shell/plugins/services/idle/` for a resident service with timers and idle, and `shell/plugins/reminders/` for a keepLoaded overlay with an `open`/`close`/`dismiss` contract.
 
 ### Development workflow
 
-- Develop in place under `~/.config/omarchy/plugins/<id>/`; saving any file there hot-reloads the plugin code, and `omarchy-shell shell rescanPlugins` forces a reload if it does not.
+- Develop in place under `~/.config/omarchy/plugins/<id>/`. Not through a symlink: the watcher is `inotifywait -r`, which does not follow symlinks, and `omarchy plugin validate` refuses a symlinked plugin folder outright.
+- Saving a file re-instantiates the plugin but can serve stale compiled QML, so the running code may not be the code on disk. `omarchy restart shell` is the reliable loop, and `omarchy-shell shell rescanPlugins` alone does not clear the component cache.
 - Validate the manifest with `omarchy plugin validate <plugin-folder>` before publishing.
 - Never touch `/usr/share/omarchy/`; it is package-owned and overwritten on update. It is the reference to read, not to edit.
 
