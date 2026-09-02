@@ -8,6 +8,11 @@ var DEFAULT_WARNING_SECONDS = 10
 // The 20-20-20 rule spelled out on the break screen: the number the break is
 // named after is the distance, not the duration, and it is the part a tired
 // user needs reminding of.
+// nf-md-pause. Both the bar label and the popup's frozen countdown show this
+// rather than spelling it out: it is the same mark as the Pause button, so the
+// state and the control that caused it read as one thing.
+var PAUSE_GLYPH = "󰏤"
+
 var DEFAULT_BREAK_HEADLINE = "Look 20 feet away"
 var DEFAULT_BREAK_MESSAGE = "Rest your eyes on something far off, at least 20 feet away"
 
@@ -148,7 +153,7 @@ function formatCountdown(seconds) {
 function widgetLabel(state, seconds) {
   switch (state) {
     case "breaking": return "break"
-    case "paused": return "paused"
+    case "paused": return PAUSE_GLYPH
     case "idle": return "away"
     case "deferred": return "hold"
     case "counting": return formatCountdown(seconds)
@@ -203,6 +208,7 @@ if (typeof module !== "undefined") {
     DEFAULT_WORK_MINUTES: DEFAULT_WORK_MINUTES,
     DEFAULT_BREAK_SECONDS: DEFAULT_BREAK_SECONDS,
     DEFAULT_WARNING_SECONDS: DEFAULT_WARNING_SECONDS,
+    PAUSE_GLYPH: PAUSE_GLYPH,
     DEFAULT_BREAK_HEADLINE: DEFAULT_BREAK_HEADLINE,
     DEFAULT_BREAK_MESSAGE: DEFAULT_BREAK_MESSAGE,
     entryFor: entryFor,

@@ -11,6 +11,8 @@ It knows when not to interrupt: it stays out of the way while you are away from
 the keyboard, while an app is holding an idle inhibitor, and while a window is
 fullscreen.
 
+![The break screen](preview.png)
+
 ## Install
 
 ```bash
@@ -77,7 +79,9 @@ interval you were already serving, only the timing values do.
   three buttons: break now, skip, and pause. **Right click** pauses and resumes
   without opening it; **middle click** breaks now.
 - The widget shows the countdown, or the reason there isn't one: `away`,
-  `hold` (waiting for fullscreen to end), `paused`, `break`.
+  `hold` (waiting for fullscreen to end), `break`, or a pause glyph — the same
+  mark as the popup's Pause button, so the state and the control that caused
+  it read as one thing.
 - **Skip** means the same thing either side of a break starting: the next one
   is a full work interval away. During a break it ends the break; before one it
   drops the break that was coming. It is inert while paused or away, where

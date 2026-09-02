@@ -192,18 +192,37 @@ Panel {
 
           // The reason the popup exists: minutes and seconds, ticking, which
           // the bar label rounds away.
-          Text {
+          Row {
             id: heroCountdown
-            textFormat: Text.PlainText
-            text: Model.panelCountdown(root.state, root.secondsToBreak)
-            color: root.imminent && root.bar ? root.bar.urgent : root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.displayLarge
-            font.bold: true
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(8)
 
-            Behavior on color { ColorAnimation { duration: 200 } }
+            // A frozen number and a running one look identical, and the
+            // stopped one is the surprising state. The glyph says which it is
+            // without waiting for the user to notice the digits are not
+            // moving.
+            Text {
+              textFormat: Text.PlainText
+              visible: root.pausedNow
+              anchors.verticalCenter: parent.verticalCenter
+              text: Model.PAUSE_GLYPH
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.display
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              anchors.verticalCenter: parent.verticalCenter
+              text: Model.panelCountdown(root.state, root.secondsToBreak)
+              color: root.imminent && root.bar ? root.bar.urgent : root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.displayLarge
+              font.bold: true
+
+              Behavior on color { ColorAnimation { duration: 200 } }
+            }
           }
         }
 
