@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+import "RestReminderModel.js" as Model
 
 // The break screen.
 //
@@ -25,8 +26,16 @@ Item {
   property int totalSeconds: 20
   property int secondsLeft: 0
 
-  readonly property string headline: "Look away"
-  readonly property string subtitle: "Rest your eyes on something at least 20 feet away"
+  // Both lines are settings, so the reminder can be worded in the user's own
+  // language. The service is the one that reads shell.json; when the overlay
+  // is summoned on its own it has no service to ask, hence the defaults here.
+  readonly property var settings: root.service && root.service.settings
+    ? root.service.settings
+    : ({})
+  readonly property string headline: root.settings.breakHeadline
+    || Model.DEFAULT_BREAK_HEADLINE
+  readonly property string subtitle: root.settings.breakMessage
+    || Model.DEFAULT_BREAK_MESSAGE
 
   // Summoned with a duration by the service; a bare summon (a keybinding, or
   // `omarchy-shell shell summon`) falls back to the configured break length.
@@ -185,6 +194,9 @@ Item {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
+          width: Math.min(implicitWidth, breakWindow.width * 0.8)
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.WordWrap
           text: root.headline
           color: Color.foreground
           font.family: Style.font.family
@@ -203,6 +215,9 @@ Item {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
+          width: Math.min(implicitWidth, breakWindow.width * 0.8)
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.WordWrap
           text: root.subtitle
           color: Color.foreground
           opacity: 0.66

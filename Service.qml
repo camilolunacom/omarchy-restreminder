@@ -130,6 +130,30 @@ Item {
     scheduleNextBreak("after-break")
   }
 
+  // One action for both sides of a break starting: mid-break it ends the
+  // break, otherwise it drops the break that is coming. Either way the next
+  // one is a full work interval out, which is what the widget's Skip button
+  // promises whichever state it is pressed in.
+  function skipBreak() {
+    if (root.breaking) {
+      if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
+      root.breakFinished(true)
+      return "ok"
+    }
+
+    // Nothing is owed while paused or away, and restarting the cycle from
+    // here would quietly undo the pause on the next resume.
+    if (root.paused) return "paused"
+
+    root.breakPending = false
+    root.warningSecondsLeft = -1
+    if (root.suspended) return "away"
+
+    logEvent("break-skipped", "before it started")
+    scheduleNextBreak("skipped")
+    return "ok"
+  }
+
   function updateWarning(secondsLeft) {
     var warnAt = root.settings.warningSeconds
 
@@ -403,12 +427,7 @@ Item {
       return "ok"
     }
 
-    function skip(): string {
-      if (!root.breaking) return "not breaking"
-      if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
-      root.breakFinished(true)
-      return "ok"
-    }
+    function skip(): string { return root.skipBreak() }
 
     // Bare `pause` is indefinite and session-only; `pause 30` survives a
     // restart and expires on its own.

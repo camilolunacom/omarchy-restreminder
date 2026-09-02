@@ -66,7 +66,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 
 - FR9: The overlay covers the full area of every connected display, above all windows, including fullscreen ones.
 - FR10: The overlay is opaque and fully obscures whatever is underneath. There is no dim-only mode: if the content stays readable, the eyes do not rest.
-- FR11: The overlay content is a short prompt ("Look 20 feet away for 20 seconds", derived from the configured values), a countdown of the remaining seconds, and a hint that Esc skips.
+- FR11: The overlay content is a headline, a countdown of the remaining seconds, a one-line message, and a hint that Esc skips. Headline and message default to the 20-20-20 rule's distance ("Look 20 feet away" / "Rest your eyes on something far off, at least 20 feet away") and are both settings, so the reminder can be reworded, translated, or given in metres.
 - FR12: The overlay grabs keyboard input while it is up, so keystrokes do not leak into the application underneath.
 - FR13: The overlay uses the shell's current theme (`Color`, `Style` singletons), like every other Omarchy surface.
 - FR14: The overlay never appears on top of the lock screen or the screensaver, and never keeps the machine awake.
@@ -98,15 +98,17 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
       "id": "camilo.restreminder",
       "workMinutes": 20,
       "breakSeconds": 20,
-      "warningSeconds": 10
+      "warningSeconds": 10,
+      "breakHeadline": "Look 20 feet away",
+      "breakMessage": "Rest your eyes on something far off, at least 20 feet away"
     }
   ]
 }
 ```
 
 - FR25: `idlePauseMinutes` is optional and omitted from the example above on purpose: it tracks `workMinutes` unless the user sets it, and is only worth setting to decouple the two.
-- FR26: Missing or invalid values fall back to the defaults (20 / 20 / 10, and `workMinutes` for `idlePauseMinutes`) instead of breaking the shell.
-- FR27: Saving `shell.json` applies the new values without restarting the shell (the shell already hot-reloads it); a change to the interval takes effect on the next timer cycle.
+- FR26: Missing or invalid values fall back to the defaults (20 / 20 / 10, `workMinutes` for `idlePauseMinutes`, and the 20-20-20 wording for the two break strings) instead of breaking the shell. A blank string counts as missing: it is a typo, not an intent to blank the break screen.
+- FR27: Saving `shell.json` applies the new values without restarting the shell (the shell already hot-reloads it); a change to the interval takes effect on the next timer cycle. Rewording the break screen is not a change to the interval and must not restart the cycle: only the timing values are compared when deciding to reschedule.
 
 ### 5.7 Manual control
 
@@ -118,7 +120,8 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 
 - FR31: The plugin ships a bar widget showing the time remaining until the next break. It refreshes once per minute above a minute, and once per second below it.
 - FR32: The widget renders the current state distinctly: counting down, deferred by fullscreen, suspended by idle, or paused by the user.
-- FR33: Clicking the widget takes a break immediately. It is also the affordance for pause and resume.
+- FR33: Clicking the widget opens a popup: the countdown to the minute and second, the current state in words, and buttons to skip and to pause or resume. Clicking a countdown asks how long exactly, which the bar slot has no room to answer. Right click pauses and resumes without opening the popup, and middle click takes a break immediately.
+- FR33a: Skip means "the next break is a full work interval away" on both sides of a break starting: during a break it ends the break, otherwise it drops the break that is coming. It is inert while paused or away, where nothing is owed, and the button says so by going dim rather than by failing silently.
 - FR34: The widget is a view, not a second source of truth. It reads state from the resident service through `shell.serviceFor("camilo.restreminder")` and holds no timer or settings of its own. There is one entry in shell.json, never two.
 - FR35: The manifest sets `barWidget.defaultSection`, so enabling the plugin places the widget on the bar automatically. No manual `omarchy bar move` is needed to see it.
 - FR36: The widget is optional. Removing it from the bar must not stop the timer or affect breaks in any way.
@@ -165,7 +168,7 @@ Omarchy 4 runs one long-lived Quickshell process (`omarchy-shell`) that hosts ev
 3. Config and warning: read `workMinutes` / `breakSeconds` / `warningSeconds` from `shell.json` with defaults and validation, hot reload, pre-break notice.
 4. Deferral: idle reset, idle inhibitors, fullscreen deferral, no collision with screensaver or lock.
 5. Control surface: the `restreminder` IPC target, including persisted timed pause.
-6. Bar widget: countdown, state rendering, click to break.
+6. Bar widget: countdown, state rendering, and the popup with skip and pause.
 7. Packaging: README, install instructions, screenshot.
 
 ## 9. Open questions

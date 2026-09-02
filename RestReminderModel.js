@@ -5,6 +5,12 @@ var DEFAULT_WORK_MINUTES = 20
 var DEFAULT_BREAK_SECONDS = 20
 var DEFAULT_WARNING_SECONDS = 10
 
+// The 20-20-20 rule spelled out on the break screen: the number the break is
+// named after is the distance, not the duration, and it is the part a tired
+// user needs reminding of.
+var DEFAULT_BREAK_HEADLINE = "Look 20 feet away"
+var DEFAULT_BREAK_MESSAGE = "Rest your eyes on something far off, at least 20 feet away"
+
 function positiveNumber(value, fallback) {
   var n = Number(value)
   return isFinite(n) && n > 0 ? n : fallback
@@ -13,6 +19,14 @@ function positiveNumber(value, fallback) {
 function nonNegativeNumber(value, fallback) {
   var n = Number(value)
   return isFinite(n) && n >= 0 ? n : fallback
+}
+
+// An empty string is a typo, not an intent to blank the break screen; only a
+// real string overrides the default.
+function nonEmptyString(value, fallback) {
+  if (typeof value !== "string") return fallback
+  var trimmed = value.trim()
+  return trimmed === "" ? fallback : trimmed
 }
 
 function findInList(list, pluginId) {
@@ -73,10 +87,15 @@ function settingsFrom(shellConfig, pluginId) {
     workMinutes: workMinutes,
     breakSeconds: breakSeconds,
     warningSeconds: warningSeconds,
-    idlePauseMinutes: idlePauseMinutes
+    idlePauseMinutes: idlePauseMinutes,
+    breakHeadline: nonEmptyString(entry.breakHeadline, DEFAULT_BREAK_HEADLINE),
+    breakMessage: nonEmptyString(entry.breakMessage, DEFAULT_BREAK_MESSAGE)
   }
 }
 
+// Timing only, on purpose. This is what decides whether an edit to shell.json
+// restarts the cycle, and rewording the break screen must not cost the user
+// the interval they had already served.
 function sameSettings(a, b) {
   if (!a || !b) return false
   return a.workMinutes === b.workMinutes
@@ -106,16 +125,43 @@ function widgetLabel(state, seconds) {
   }
 }
 
-function widgetTooltip(state, seconds) {
+// The popup has room the bar slot does not, so it shows the exact time
+// rather than the rounded minute the label has to settle for.
+function formatClock(seconds) {
+  if (!isFinite(seconds) || seconds < 0) return "--:--"
+  var total = Math.max(0, Math.round(seconds))
+  var minutes = Math.floor(total / 60)
+  var rest = total % 60
+  return String(minutes) + ":" + (rest < 10 ? "0" : "") + String(rest)
+}
+
+// ------------------------------------------------------------------- popup
+
+function panelCountdown(state, seconds) {
+  return state === "counting" ? formatClock(seconds) : "--:--"
+}
+
+function panelStatus(state) {
   switch (state) {
-    case "breaking": return "Eye break in progress"
-    case "paused": return "Rest reminders paused. Right click to resume"
-    case "idle": return "Away from the keyboard; the timer restarts when you get back"
-    case "deferred": return "A break is waiting for fullscreen to end"
-    case "counting": return "Next eye break in " + formatCountdown(seconds)
-      + "\nClick to break now, right click to pause"
+    case "breaking": return "Break in progress"
+    case "paused": return "Reminders paused"
+    case "idle": return "Away from the keyboard"
+    case "deferred": return "Waiting for fullscreen"
+    case "counting": return "Until the next break"
     default: return "Rest Reminder"
   }
+}
+
+// Skip means two different things either side of a break starting, and the
+// button says which one it is about to do.
+function skipLabel(state) {
+  return state === "breaking" ? "End break" : "Skip"
+}
+
+function skipTooltip(state) {
+  return state === "breaking"
+    ? "End this break now"
+    : "Skip the next break and start a fresh interval"
 }
 
 if (typeof module !== "undefined") {
@@ -123,11 +169,17 @@ if (typeof module !== "undefined") {
     DEFAULT_WORK_MINUTES: DEFAULT_WORK_MINUTES,
     DEFAULT_BREAK_SECONDS: DEFAULT_BREAK_SECONDS,
     DEFAULT_WARNING_SECONDS: DEFAULT_WARNING_SECONDS,
+    DEFAULT_BREAK_HEADLINE: DEFAULT_BREAK_HEADLINE,
+    DEFAULT_BREAK_MESSAGE: DEFAULT_BREAK_MESSAGE,
     entryFor: entryFor,
     settingsFrom: settingsFrom,
     sameSettings: sameSettings,
     formatCountdown: formatCountdown,
+    formatClock: formatClock,
     widgetLabel: widgetLabel,
-    widgetTooltip: widgetTooltip
+    panelCountdown: panelCountdown,
+    panelStatus: panelStatus,
+    skipLabel: skipLabel,
+    skipTooltip: skipTooltip
   }
 }

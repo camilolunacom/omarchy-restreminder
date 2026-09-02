@@ -31,26 +31,38 @@ widget is on the bar, and in `plugins[]` when it is not:
   "id": "camilo.restreminder",
   "workMinutes": 20,
   "breakSeconds": 20,
-  "warningSeconds": 10
+  "warningSeconds": 10,
+  "breakHeadline": "Look 20 feet away",
+  "breakMessage": "Rest your eyes on something far off, at least 20 feet away"
 }
 ```
 
-| Key                | Default        | What it does                                                     |
-|--------------------|----------------|------------------------------------------------------------------|
-| `workMinutes`      | `20`           | Minutes of work between breaks                                     |
-| `breakSeconds`     | `20`           | How long the break screen stays up                                 |
-| `warningSeconds`   | `10`           | Heads-up before the break; `0` turns it off                        |
-| `idlePauseMinutes` | `workMinutes`  | Time away from the keyboard that counts as having taken the break  |
+| Key                | Default                                                       | What it does                                                      |
+|--------------------|---------------------------------------------------------------|-------------------------------------------------------------------|
+| `workMinutes`      | `20`                                                          | Minutes of work between breaks                                      |
+| `breakSeconds`     | `20`                                                          | How long the break screen stays up                                  |
+| `warningSeconds`   | `10`                                                          | Heads-up before the break; `0` turns it off                         |
+| `idlePauseMinutes` | `workMinutes`                                                 | Time away from the keyboard that counts as having taken the break   |
+| `breakHeadline`    | `Look 20 feet away`                                           | Big line on the break screen                                        |
+| `breakMessage`     | `Rest your eyes on something far off, at least 20 feet away`  | Line under the countdown                                            |
 
 Anything missing or malformed falls back to its default rather than breaking
-the shell.
+the shell, and a blank string counts as missing. The two strings are yours to
+reword, translate, or put in metres; changing them does not restart the
+interval you were already serving, only the timing values do.
 
 ## Using it
 
 - **Esc** during a break skips it and restarts the interval.
-- **Click** the bar widget to break now; **right click** to pause and resume.
+- **Click** the bar widget for a popup with the countdown to the second and
+  buttons to skip or pause; **right click** pauses and resumes without opening
+  it, **middle click** breaks now.
 - The widget shows the countdown, or the reason there isn't one: `away`,
   `hold` (waiting for fullscreen to end), `paused`, `break`.
+- **Skip** means the same thing either side of a break starting: the next one
+  is a full work interval away. During a break it ends the break; before one it
+  drops the break that was coming. It is inert while paused or away, where
+  nothing is owed.
 
 Everything is scriptable through the shell's IPC, which is what a Hyprland
 keybinding would call:
@@ -60,9 +72,15 @@ omarchy-shell restreminder status      # JSON: state, countdown, why it is defer
 omarchy-shell restreminder breakNow
 omarchy-shell restreminder skip
 omarchy-shell restreminder pause 30    # timed; survives a shell restart
-omarchy-shell restreminder pause       # indefinite; cleared by a restart
+omarchy-shell restreminder pause ""    # indefinite; cleared by a restart
 omarchy-shell restreminder resume
+
+omarchy-shell restreminder-popup toggle    # the widget's popup
 ```
+
+The pause argument is not optional at the IPC layer even though an indefinite
+pause takes no duration: `omarchy-shell` rejects a call with fewer arguments
+than the handler declares, so the indefinite form passes an empty string.
 
 ## When a break does not fire
 
@@ -103,6 +121,6 @@ Two things that cost time here, worth knowing before they cost you the same:
 |-------------------------|--------------------------------------------------------------|
 | `Service.qml`           | Resident service: the timer, the deferral rules, the IPC     |
 | `BreakOverlay.qml`      | The break screen and the pre-break warning                   |
-| `BarWidget.qml`         | The countdown widget                                         |
+| `BarWidget.qml`         | The countdown widget and its popup                           |
 | `RestReminderModel.js`  | Pure helpers: settings parsing, label formatting             |
 | `PRD.md`                | What this is meant to do, and why                            |
