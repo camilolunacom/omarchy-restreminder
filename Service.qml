@@ -1,5 +1,8 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Io
+import Quickshell.Wayland
 import "RestReminderModel.js" as Model
 
 // Rest Reminder: the resident half of the plugin.
@@ -31,6 +34,41 @@ Item {
   // Seconds left on the pre-break warning, or -1 when no warning is showing.
   // The overlay renders off this; the service decides when it applies.
   property int warningSecondsLeft: -1
+
+  // A break came due while something was blocking it. Exactly one is owed, no
+  // matter how long the block lasts.
+  property bool breakPending: false
+  property bool suspended: false
+
+  // Epoch milliseconds a timed pause runs out, or 0. An indefinite pause is
+  // deliberately not persisted: forgotten, it would defeat the plugin
+  // silently, while a timed pause cut short by a shell restart -- and
+  // `omarchy update` restarts the shell -- would be a bug.
+  property double pausedUntil: 0
+  property bool pausedIndefinitely: false
+  readonly property bool paused: root.pausedIndefinitely || root.pausedUntil > 0
+
+  readonly property string home: Quickshell.env("HOME")
+  readonly property string stateDir: root.home + "/.local/state/omarchy"
+  readonly property string statePath: root.stateDir + "/restreminder"
+
+  // Wayland exposes no way to ask whether some app is holding an idle
+  // inhibitor. Two monitors on the same timeout answer it indirectly: when
+  // input has stopped but only the inhibitor-blind one reports idle, an
+  // inhibitor is what is holding the session awake. It reads as "a player or a
+  // call is running and the user is not typing" -- which is exactly when a
+  // break screen would be an interruption rather than a rest.
+  readonly property bool inhibitorActive: inhibitorProbeRaw.isIdle && !inhibitorProbeRespecting.isIdle
+
+  readonly property bool fullscreenActive: Hyprland.focusedWorkspace
+    ? Hyprland.focusedWorkspace.hasFullscreen === true
+    : false
+
+  readonly property bool deferring: root.fullscreenActive || root.inhibitorActive
+
+  readonly property string deferReason: root.fullscreenActive
+    ? (root.inhibitorActive ? "fullscreen+inhibitor" : "fullscreen")
+    : (root.inhibitorActive ? "inhibitor" : "")
   property string lastEvent: "starting"
   property string lastEventAt: ""
 
@@ -85,8 +123,10 @@ Item {
   function updateWarning(secondsLeft) {
     var warnAt = root.settings.warningSeconds
 
-    // A zero warning is the documented way to turn the notice off.
-    if (warnAt <= 0 || secondsLeft > warnAt) {
+    // A zero warning is the documented way to turn the notice off. A deferred
+    // break has no landing time to announce, so it stays quiet until the
+    // block clears.
+    if (warnAt <= 0 || secondsLeft > warnAt || root.deferring) {
       if (root.warningSecondsLeft >= 0) root.warningSecondsLeft = -1
       return
     }
@@ -95,14 +135,146 @@ Item {
     root.warningSecondsLeft = Math.max(0, secondsLeft)
   }
 
+  function expirePauseIfDue() {
+    if (root.pausedUntil <= 0) return
+    if (Date.now() < root.pausedUntil) return
+
+    root.pausedUntil = 0
+    persistPause()
+    logEvent("pause-expired")
+    if (!root.suspended) scheduleNextBreak("pause-expired")
+  }
+
+  function persistPause() {
+    // Only the timed pause is durable; anything else clears the file.
+    pauseState.setText(root.pausedUntil > 0 ? String(Math.round(root.pausedUntil)) : "")
+  }
+
+  function restorePause() {
+    var stored = Number(String(pauseState.text() || "").trim())
+    if (!isFinite(stored) || stored <= Date.now()) {
+      if (stored > 0) persistPause()
+      return
+    }
+
+    root.pausedUntil = stored
+    root.nextBreakAt = 0
+    root.warningSecondsLeft = -1
+    logEvent("pause-restored", Math.round((stored - Date.now()) / 1000) + "s left")
+  }
+
+  function pause(minutes) {
+    var mins = Number(minutes)
+    root.breakPending = false
+    root.nextBreakAt = 0
+    root.warningSecondsLeft = -1
+
+    if (isFinite(mins) && mins > 0) {
+      root.pausedIndefinitely = false
+      root.pausedUntil = Date.now() + mins * 60000
+      persistPause()
+      logEvent("pause", mins + "m")
+      return "paused for " + mins + "m"
+    }
+
+    root.pausedIndefinitely = true
+    root.pausedUntil = 0
+    persistPause()
+    logEvent("pause", "indefinite")
+    return "paused"
+  }
+
+  function unpause() {
+    if (!root.paused) return "not paused"
+
+    root.pausedIndefinitely = false
+    root.pausedUntil = 0
+    persistPause()
+    logEvent("resume", "requested")
+    if (!root.suspended) scheduleNextBreak("resumed")
+    return "resumed"
+  }
+
+  function statusJson() {
+    return JSON.stringify({
+      state: root.breaking ? "breaking"
+        : root.paused ? "paused"
+        : root.suspended ? "idle"
+        : root.breakPending ? "deferred"
+        : "counting",
+      secondsToBreak: root.secondsToBreak,
+      warningSecondsLeft: root.warningSecondsLeft,
+      breaking: root.breaking,
+      deferring: root.deferring,
+      deferReason: root.deferReason,
+      fullscreen: root.fullscreenActive,
+      inhibitor: root.inhibitorActive,
+      idle: root.awayMonitor ? root.awayMonitor.isIdle === true : false,
+      idleTimeout: root.idleTimeoutSeconds,
+      suspended: root.suspended,
+      paused: root.paused,
+      pausedUntil: root.pausedUntil,
+      settings: root.settings,
+      lastEvent: root.lastEvent,
+      lastEventAt: root.lastEventAt
+    })
+  }
+
   function tick() {
-    if (root.breaking) return
+    expirePauseIfDue()
+    if (root.paused) return
+    if (root.breaking || root.suspended) return
+    if (root.breakPending) {
+      if (!root.deferring) releaseDeferredBreak()
+      return
+    }
     if (root.nextBreakAt <= 0) return
 
     var secondsLeft = Math.ceil((root.nextBreakAt - Date.now()) / 1000)
     updateWarning(secondsLeft)
 
-    if (secondsLeft <= 0) root.startBreak()
+    if (secondsLeft > 0) return
+
+    if (root.deferring) {
+      if (!root.breakPending) logEvent("break-deferred", root.deferReason)
+      root.breakPending = true
+      root.nextBreakAt = 0
+      return
+    }
+
+    root.startBreak()
+  }
+
+  // Coming back from a deferral re-arms the warning rather than dropping the
+  // break screen on a user who just closed a video.
+  function releaseDeferredBreak() {
+    if (!root.breakPending || root.suspended) return
+    root.breakPending = false
+
+    var lead = root.settings.warningSeconds
+    if (lead <= 0) {
+      logEvent("break-released", "no warning configured")
+      root.startBreak()
+      return
+    }
+
+    logEvent("break-released", "warning in " + lead + "s")
+    root.nextBreakAt = Date.now() + lead * 1000
+  }
+
+  function suspend(reason) {
+    if (root.suspended) return
+    root.suspended = true
+    root.breakPending = false
+    root.nextBreakAt = 0
+    root.warningSecondsLeft = -1
+    logEvent("suspend", reason)
+  }
+
+  function resume(reason) {
+    if (!root.suspended) return
+    root.suspended = false
+    scheduleNextBreak(reason)
   }
 
   // A new object arrives on every shell.json reload, so compare by value:
@@ -122,9 +294,109 @@ Item {
     scheduleNextBreak("settings-changed")
   }
 
+  // Being away from the screen for a whole idle threshold is the break. The
+  // timer stops while the user is gone and starts over when they return, so a
+  // break never greets someone walking back to their desk.
+  // IdleMonitor takes its timeout when the underlying idle notification is
+  // registered and ignores a binding that resolves later: bound to a config
+  // value it silently never reports idle. So it is built by hand, with the
+  // timeout passed as an initial property, and rebuilt whenever the
+  // configured threshold changes.
+  Component {
+    id: awayMonitorComponent
+
+    IdleMonitor {
+      enabled: true
+      respectInhibitors: true
+      onIsIdleChanged: {
+        if (isIdle) root.suspend("idle over " + root.settings.idlePauseMinutes + "m")
+        else root.resume("back from idle")
+      }
+    }
+  }
+
+  property var awayMonitor: null
+
+  // Floored: sub-second thresholds are not honoured by the compositor, and a
+  // monitor that never fires would silently disable the idle rules.
+  readonly property int idleTimeoutSeconds: Math.max(
+    5, Math.round(root.settings.idlePauseMinutes * 60))
+
+  function rebuildAwayMonitor() {
+    if (root.awayMonitor) {
+      root.awayMonitor.destroy()
+      root.awayMonitor = null
+    }
+
+    root.awayMonitor = awayMonitorComponent.createObject(root, { timeout: root.idleTimeoutSeconds })
+    if (!root.awayMonitor) logEvent("idle-monitor-failed", "could not create the idle monitor")
+  }
+
+  onIdleTimeoutSecondsChanged: if (root.started) rebuildAwayMonitor()
+
+  // The inhibitor probe pair. Short and equal timeouts; only the gap between
+  // them carries meaning.
+  IdleMonitor {
+    id: inhibitorProbeRaw
+    enabled: true
+    timeout: 60
+    respectInhibitors: false
+  }
+
+  IdleMonitor {
+    id: inhibitorProbeRespecting
+    enabled: true
+    timeout: 60
+    respectInhibitors: true
+  }
+
+  // FileView cannot create the directory it writes into.
+  Process {
+    id: stateDirInit
+    running: true
+    command: ["mkdir", "-p", root.stateDir]
+    onExited: {
+      pauseState.reload()
+      root.restorePause()
+    }
+  }
+
+  FileView {
+    id: pauseState
+    path: root.statePath
+    atomicWrites: true
+    printErrors: false
+  }
+
+  IpcHandler {
+    target: "restreminder"
+
+    function status(): string { return root.statusJson() }
+
+    function breakNow(): string {
+      if (root.breaking) return "already breaking"
+      root.startBreak()
+      return "ok"
+    }
+
+    function skip(): string {
+      if (!root.breaking) return "not breaking"
+      if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
+      root.breakFinished(true)
+      return "ok"
+    }
+
+    // Bare `pause` is indefinite and session-only; `pause 30` survives a
+    // restart and expires on its own.
+    function pause(minutes: string): string { return root.pause(minutes) }
+
+    function resume(): string { return root.unpause() }
+  }
+
   Component.onCompleted: {
     root.started = true
     root.appliedSettings = root.settings
+    rebuildAwayMonitor()
     scheduleNextBreak("startup")
   }
 
