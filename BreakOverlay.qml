@@ -75,6 +75,59 @@ Item {
     }
   }
 
+  // ------------------------------------------------------------- warning
+  //
+  // A passive heads-up that a break is coming, so it never lands mid-keystroke.
+  // No keyboard focus and click-through everywhere except its own card: this
+  // must not interrupt anything, it only announces.
+  readonly property int warningSecondsLeft: root.service ? root.service.warningSecondsLeft : -1
+  readonly property bool warningVisible: root.warningSecondsLeft >= 0 && !root.opened
+
+  Variants {
+    model: Quickshell.screens
+
+    PanelWindow {
+      id: warningWindow
+      required property var modelData
+      screen: modelData
+      visible: root.warningVisible
+
+      anchors { left: true; right: true; bottom: true }
+      implicitHeight: warningCard.implicitHeight + Style.gapsOut * 4
+      color: "transparent"
+
+      WlrLayershell.namespace: "restreminder-warning"
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+      exclusionMode: ExclusionMode.Ignore
+
+      mask: Region { item: warningCard }
+
+      Rectangle {
+        id: warningCard
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Style.gapsOut * 2
+        implicitWidth: warningText.implicitWidth + Style.space(32)
+        implicitHeight: warningText.implicitHeight + Style.space(20)
+        radius: Style.cornerRadius
+        color: Color.popups.background
+        border.width: Math.max(1, Style.space(1))
+        border.color: Color.popups.border
+
+        Text {
+          id: warningText
+          anchors.centerIn: parent
+          text: "Eye break in " + root.warningSecondsLeft + "s"
+          color: Color.popups.text
+          font.family: Style.font.family
+          font.pixelSize: Style.font.subtitle
+          textFormat: Text.PlainText
+        }
+      }
+    }
+  }
+
   Variants {
     model: Quickshell.screens
 

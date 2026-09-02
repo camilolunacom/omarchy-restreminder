@@ -27,6 +27,10 @@ Item {
   // Epoch milliseconds. 0 means no cycle is scheduled.
   property double nextBreakAt: 0
   property bool breaking: false
+
+  // Seconds left on the pre-break warning, or -1 when no warning is showing.
+  // The overlay renders off this; the service decides when it applies.
+  property int warningSecondsLeft: -1
   property string lastEvent: "starting"
   property string lastEventAt: ""
 
@@ -52,6 +56,7 @@ Item {
     if (root.breaking) return
     root.breaking = true
     root.nextBreakAt = 0
+    root.warningSecondsLeft = -1
     logEvent("break-start", "break=" + root.settings.breakSeconds + "s")
 
     if (!root.shell || typeof root.shell.summon !== "function") {
@@ -77,10 +82,27 @@ Item {
     scheduleNextBreak("after-break")
   }
 
+  function updateWarning(secondsLeft) {
+    var warnAt = root.settings.warningSeconds
+
+    // A zero warning is the documented way to turn the notice off.
+    if (warnAt <= 0 || secondsLeft > warnAt) {
+      if (root.warningSecondsLeft >= 0) root.warningSecondsLeft = -1
+      return
+    }
+
+    if (root.warningSecondsLeft < 0) logEvent("warning-start", secondsLeft + "s to break")
+    root.warningSecondsLeft = Math.max(0, secondsLeft)
+  }
+
   function tick() {
     if (root.breaking) return
     if (root.nextBreakAt <= 0) return
-    if (Date.now() >= root.nextBreakAt) root.startBreak()
+
+    var secondsLeft = Math.ceil((root.nextBreakAt - Date.now()) / 1000)
+    updateWarning(secondsLeft)
+
+    if (secondsLeft <= 0) root.startBreak()
   }
 
   // A new object arrives on every shell.json reload, so compare by value:
