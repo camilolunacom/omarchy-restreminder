@@ -74,14 +74,22 @@ interval you were already serving, only the timing values do.
 
 - **Esc** during a break skips it and restarts the interval.
 - **Click** the bar widget for a popup with the countdown to the second and
-  buttons to skip or pause; **right click** pauses and resumes without opening
-  it, **middle click** breaks now.
+  three buttons: break now, skip, and pause. **Right click** pauses and resumes
+  without opening it; **middle click** breaks now.
 - The widget shows the countdown, or the reason there isn't one: `away`,
   `hold` (waiting for fullscreen to end), `paused`, `break`.
 - **Skip** means the same thing either side of a break starting: the next one
   is a full work interval away. During a break it ends the break; before one it
   drops the break that was coming. It is inert while paused or away, where
   nothing is owed.
+- **Pause freezes the countdown; it does not restart it.** Resuming picks up
+  where you left off, so a pause is "not now" rather than "give me another
+  twenty minutes" — the strain you had already earned does not go away because
+  you stepped out of the way of a break. Resuming with almost no time left
+  gives you the warning lead back rather than dropping the break screen on you
+  in the same instant.
+- Being **away** from the keyboard is different, and does restart the
+  interval: that one really was a break.
 
 Everything is scriptable through the shell's IPC, which is what a Hyprland
 keybinding would call:

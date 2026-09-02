@@ -104,6 +104,37 @@ function sameSettings(a, b) {
     && a.idlePauseMinutes === b.idlePauseMinutes
 }
 
+// ------------------------------------------------------------------- state
+
+// The pause state file used to hold a bare epoch-millis timestamp; it now
+// holds the frozen remainder alongside it. Both are read, so upgrading in
+// place over a live pause does not resurrect it with a full interval behind
+// it. Anything unparseable reads as no pause at all rather than throwing:
+// a corrupt state file must not take the shell down on startup.
+function storedPause(raw) {
+  var text = String(raw || "").trim()
+  if (text === "") return null
+
+  if (text.charAt(0) === "{") {
+    var parsed = null
+    try { parsed = JSON.parse(text) } catch (e) { return null }
+    if (!parsed) return null
+
+    var until = Number(parsed.pausedUntil)
+    if (!isFinite(until) || until <= 0) return null
+
+    var remaining = Number(parsed.remaining)
+    return {
+      pausedUntil: until,
+      remaining: isFinite(remaining) && remaining >= 0 ? remaining : -1
+    }
+  }
+
+  var legacy = Number(text)
+  if (!isFinite(legacy) || legacy <= 0) return null
+  return { pausedUntil: legacy, remaining: -1 }
+}
+
 // ------------------------------------------------------------------ widget
 
 // Compact enough for a bar slot: minutes until the break, seconds only once
@@ -137,8 +168,11 @@ function formatClock(seconds) {
 
 // ------------------------------------------------------------------- popup
 
+// Paused shows a number too: it is frozen, not spent, and hiding it would
+// make a pause look like the interval had been thrown away.
 function panelCountdown(state, seconds) {
-  return state === "counting" ? formatClock(seconds) : "--:--"
+  if (state !== "counting" && state !== "paused") return "--:--"
+  return formatClock(seconds)
 }
 
 function panelStatus(state) {
@@ -174,6 +208,7 @@ if (typeof module !== "undefined") {
     entryFor: entryFor,
     settingsFrom: settingsFrom,
     sameSettings: sameSettings,
+    storedPause: storedPause,
     formatCountdown: formatCountdown,
     formatClock: formatClock,
     widgetLabel: widgetLabel,

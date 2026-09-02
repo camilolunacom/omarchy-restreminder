@@ -30,6 +30,10 @@ Panel {
 
   readonly property bool pausedNow: root.service ? root.service.paused === true : false
 
+  // Breaking now is the one thing a paused reminder should not do behind the
+  // user's back: they just said not now.
+  readonly property bool canBreak: root.state !== "breaking" && !root.pausedNow
+
   // Skipping is only meaningful while a break is running or on its way. Paused
   // and away both mean nothing is owed, so the button says so by going dim
   // rather than by failing silently.
@@ -55,9 +59,12 @@ Panel {
   // cursor ring nobody asked for.
   property bool cursorActive: false
   property int cursorIndex: 0
+  readonly property int lastCursorIndex: 2
 
   function takeBreak() {
+    if (!root.canBreak) return
     if (root.service && typeof root.service.startBreak === "function") root.service.startBreak()
+    root.close()
   }
 
   function skipBreak() {
@@ -74,11 +81,12 @@ Panel {
   function moveCursor(dx) {
     if (dx === 0) return
     root.cursorActive = true
-    root.cursorIndex = Math.max(0, Math.min(1, root.cursorIndex + dx))
+    root.cursorIndex = Math.max(0, Math.min(root.lastCursorIndex, root.cursorIndex + dx))
   }
 
   function activateCursor() {
-    if (root.cursorIndex === 0) root.skipBreak()
+    if (root.cursorIndex === 0) root.takeBreak()
+    else if (root.cursorIndex === 1) root.skipBreak()
     else root.togglePause()
   }
 
@@ -119,7 +127,7 @@ Panel {
     // Wide enough for the longest status line beside the countdown; below
     // this the caption elides and the popup stops saying anything the bar
     // label wasn't already saying.
-    contentWidth: panel.fittedContentWidth(Style.space(360))
+    contentWidth: panel.fittedContentWidth(Style.space(400))
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -133,7 +141,8 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
-        if (t === "s" || t === "S") root.skipBreak()
+        if (t === "b" || t === "B") root.takeBreak()
+        else if (t === "s" || t === "S") root.skipBreak()
         else if (t === "p" || t === "P") root.togglePause()
       }
 
@@ -208,7 +217,29 @@ Panel {
           width: parent.width
           spacing: Style.space(6)
 
-          readonly property real cellWidth: (width - spacing) / 2
+          readonly property real cellWidth: (width - spacing * 2) / 3
+
+          Button {
+            width: actionRow.cellWidth
+            iconText: "󰈉"
+            iconSize: Style.font.title
+            text: "Break"
+            tooltipText: "Start an eye break right now"
+            fontSize: Style.font.bodySmall
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+            bordered: true
+            enabled: root.canBreak
+            opacity: root.canBreak ? 1.0 : 0.45
+            hasCursor: root.cursorActive && root.cursorIndex === 0
+            onClicked: root.takeBreak()
+            onHovered: function(h) {
+              if (!h) return
+              root.cursorActive = true
+              root.cursorIndex = 0
+            }
+          }
 
           Button {
             width: actionRow.cellWidth
@@ -223,12 +254,12 @@ Panel {
             bordered: true
             enabled: root.canSkip
             opacity: root.canSkip ? 1.0 : 0.45
-            hasCursor: root.cursorActive && root.cursorIndex === 0
+            hasCursor: root.cursorActive && root.cursorIndex === 1
             onClicked: root.skipBreak()
             onHovered: function(h) {
               if (!h) return
               root.cursorActive = true
-              root.cursorIndex = 0
+              root.cursorIndex = 1
             }
           }
 
@@ -246,12 +277,12 @@ Panel {
             verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
             bordered: true
             active: root.pausedNow
-            hasCursor: root.cursorActive && root.cursorIndex === 1
+            hasCursor: root.cursorActive && root.cursorIndex === 2
             onClicked: root.togglePause()
             onHovered: function(h) {
               if (!h) return
               root.cursorActive = true
-              root.cursorIndex = 1
+              root.cursorIndex = 2
             }
           }
         }

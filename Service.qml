@@ -48,6 +48,13 @@ Item {
   property bool pausedIndefinitely: false
   readonly property bool paused: root.pausedIndefinitely || root.pausedUntil > 0
 
+  // Seconds left on the work interval when the pause landed, or -1 when there
+  // was nothing to freeze. A pause means "not now", not "give me a fresh
+  // interval": the strain already earned does not go away because the user
+  // stepped out of the way of a break, so the countdown is frozen and picked
+  // up where it stopped.
+  property double pausedRemaining: -1
+
   readonly property string home: Quickshell.env("HOME")
   readonly property string stateDir: root.home + "/.local/state/omarchy"
   readonly property string statePath: root.stateDir + "/restreminder"
@@ -176,29 +183,73 @@ Item {
     root.pausedUntil = 0
     persistPause()
     logEvent("pause-expired")
-    if (!root.suspended) scheduleNextBreak("pause-expired")
+    if (!root.suspended) resumeFrozenCycle("pause-expired")
   }
 
-  function persistPause() {
-    // Only the timed pause is durable; anything else clears the file.
-    pauseState.setText(root.pausedUntil > 0 ? String(Math.round(root.pausedUntil)) : "")
-  }
+  // Picks the cycle up where the pause froze it. With no remainder to honour
+  // -- nothing was counting when the pause landed, or the interval changed
+  // underneath it -- this is an ordinary fresh cycle.
+  //
+  // The remainder is floored at the warning lead for the same reason
+  // releaseDeferredBreak() uses it: resuming must not drop a break screen on
+  // someone in the very instant they asked to carry on.
+  function resumeFrozenCycle(reason) {
+    var remaining = root.pausedRemaining
+    root.pausedRemaining = -1
 
-  function restorePause() {
-    var stored = Number(String(pauseState.text() || "").trim())
-    if (!isFinite(stored) || stored <= Date.now()) {
-      if (stored > 0) persistPause()
+    if (!(remaining >= 0)) {
+      scheduleNextBreak(reason)
       return
     }
 
-    root.pausedUntil = stored
+    var seconds = Math.max(remaining, root.settings.warningSeconds)
+    root.nextBreakAt = Date.now() + seconds * 1000
+    root.secondsToBreak = Math.round(seconds)
+    logEvent("cycle-resume", reason + " " + Math.round(seconds) + "s left of the interval")
+  }
+
+  // Only the timed pause is durable; anything else clears the file. The frozen
+  // remainder rides along with it, or a restart mid-pause would hand back a
+  // full interval and quietly undo the freeze.
+  function persistPause() {
+    if (root.pausedUntil <= 0) {
+      pauseState.setText("")
+      return
+    }
+
+    pauseState.setText(JSON.stringify({
+      pausedUntil: Math.round(root.pausedUntil),
+      remaining: Math.round(root.pausedRemaining)
+    }))
+  }
+
+  function restorePause() {
+    var stored = Model.storedPause(pauseState.text())
+    if (!stored || stored.pausedUntil <= Date.now()) {
+      persistPause()
+      return
+    }
+
+    root.pausedUntil = stored.pausedUntil
+    root.pausedRemaining = stored.remaining
     root.nextBreakAt = 0
     root.warningSecondsLeft = -1
-    logEvent("pause-restored", Math.round((stored - Date.now()) / 1000) + "s left")
+    logEvent("pause-restored", Math.round((stored.pausedUntil - Date.now()) / 1000) + "s of pause, "
+      + (stored.remaining >= 0 ? Math.round(stored.remaining) + "s of interval frozen" : "no frozen interval"))
   }
 
   function pause(minutes) {
     var mins = Number(minutes)
+
+    // Freeze before anything clears the cycle, and only on the first pause:
+    // pausing twice must not overwrite the remainder with the zero the first
+    // pause left behind.
+    if (!root.paused) {
+      root.pausedRemaining = root.nextBreakAt > 0
+        ? Math.max(0, (root.nextBreakAt - Date.now()) / 1000)
+        : -1
+    }
+
     root.breakPending = false
     root.nextBreakAt = 0
     root.warningSecondsLeft = -1
@@ -225,7 +276,7 @@ Item {
     root.pausedUntil = 0
     persistPause()
     logEvent("resume", "requested")
-    if (!root.suspended) scheduleNextBreak("resumed")
+    if (!root.suspended) resumeFrozenCycle("resumed")
     return "resumed"
   }
 
@@ -244,6 +295,7 @@ Item {
       suspended: root.suspended,
       paused: root.paused,
       pausedUntil: root.pausedUntil,
+      pausedRemaining: root.pausedRemaining,
       settings: root.settings,
       lastEvent: root.lastEvent,
       lastEventAt: root.lastEventAt
@@ -254,7 +306,11 @@ Item {
     expirePauseIfDue()
 
     if (root.paused || root.breaking || root.suspended) {
-      root.secondsToBreak = -1
+      // A pause freezes the interval rather than spending it, so there is
+      // still a number to report; it just stops moving.
+      root.secondsToBreak = root.paused && root.pausedRemaining >= 0
+        ? Math.round(root.pausedRemaining)
+        : -1
       return
     }
 
@@ -314,6 +370,9 @@ Item {
   function resume(reason) {
     if (!root.suspended) return
     root.suspended = false
+    // Being away is itself the break, so it also spends whatever a pause had
+    // frozen: coming back must not land the break the pause was holding.
+    root.pausedRemaining = -1
     scheduleNextBreak(reason)
   }
 
@@ -331,6 +390,8 @@ Item {
     if (!root.started) return
     if (Model.sameSettings(root.appliedSettings, root.settings)) return
     root.appliedSettings = root.settings
+    // A new interval invalidates a remainder measured against the old one.
+    root.pausedRemaining = -1
     scheduleNextBreak("settings-changed")
   }
 
