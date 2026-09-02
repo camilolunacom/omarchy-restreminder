@@ -26,6 +26,7 @@ Item {
 
   // Epoch milliseconds. 0 means no cycle is scheduled.
   property double nextBreakAt: 0
+  property bool breaking: false
   property string lastEvent: "starting"
   property string lastEventAt: ""
 
@@ -45,13 +46,39 @@ Item {
     logEvent("cycle-start", (reason || "scheduled") + " work=" + root.settings.workMinutes + "m break=" + root.settings.breakSeconds + "s")
   }
 
+  // The overlay owns the countdown and calls back into breakFinished(), so the
+  // service stops counting for the duration of the break.
   function startBreak() {
-    // Milestone 2 replaces this with the overlay.
-    logEvent("break-due", "break=" + root.settings.breakSeconds + "s")
+    if (root.breaking) return
+    root.breaking = true
+    root.nextBreakAt = 0
+    logEvent("break-start", "break=" + root.settings.breakSeconds + "s")
+
+    if (!root.shell || typeof root.shell.summon !== "function") {
+      logEvent("break-failed", "no shell to summon the overlay")
+      root.breaking = false
+      scheduleNextBreak("overlay-unavailable")
+      return
+    }
+
+    var payload = JSON.stringify({ seconds: root.settings.breakSeconds })
+    if (!root.shell.summon(root.pluginId, payload)) {
+      logEvent("break-failed", "overlay refused to summon")
+      root.breaking = false
+      scheduleNextBreak("overlay-unavailable")
+    }
+  }
+
+  // Called by the overlay when the countdown runs out or the user presses Esc.
+  function breakFinished(skipped) {
+    if (!root.breaking) return
+    root.breaking = false
+    logEvent("break-end", skipped === true ? "skipped" : "completed")
     scheduleNextBreak("after-break")
   }
 
   function tick() {
+    if (root.breaking) return
     if (root.nextBreakAt <= 0) return
     if (Date.now() >= root.nextBreakAt) root.startBreak()
   }

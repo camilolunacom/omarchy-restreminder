@@ -6,10 +6,12 @@
   "author": "Camilo Luna",
   "description": "20-20-20 eye break reminders: a fullscreen break screen every 20 minutes",
   "kinds": [
-    "service"
+    "service",
+    "overlay"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "service": "Service.qml"
+    "service": "Service.qml",
+    "overlay": "BreakOverlay.qml"
   }
 }

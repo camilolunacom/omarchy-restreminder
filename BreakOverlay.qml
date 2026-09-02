@@ -1,0 +1,173 @@
+import QtQuick
+import Quickshell
+import Quickshell.Wayland
+import qs.Commons
+
+// The break screen.
+//
+// One opaque layer-shell window per output, above everything, for the length
+// of the break. Opaque rather than dimmed on purpose: if the work underneath
+// stays readable, the eyes never leave the screen and the break does nothing.
+Item {
+  id: root
+
+  // Injected by the shell's panel loader.
+  property var shell: null
+  property var manifest: null
+  property var service: null
+  property string omarchyPath: ""
+
+  readonly property string pluginId: manifest && manifest.id
+    ? String(manifest.id)
+    : "camilo.restreminder"
+
+  property bool opened: false
+  property int totalSeconds: 20
+  property int secondsLeft: 0
+
+  readonly property string headline: "Look away"
+  readonly property string subtitle: "Rest your eyes on something at least 20 feet away"
+
+  // Summoned with a duration by the service; a bare summon (a keybinding, or
+  // `omarchy-shell shell summon`) falls back to the configured break length.
+  function open(payloadJson) {
+    var payload = ({})
+    try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
+
+    var seconds = Number(payload.seconds)
+    if (!isFinite(seconds) || seconds <= 0) {
+      seconds = root.service && root.service.settings
+        ? root.service.settings.breakSeconds
+        : 20
+    }
+
+    root.totalSeconds = Math.max(1, Math.round(seconds))
+    root.secondsLeft = root.totalSeconds
+    root.opened = true
+  }
+
+  function close() {
+    root.opened = false
+  }
+
+  // Ends the break and tells the service how it ended, so the cycle restarts
+  // from here either way.
+  function finish(skipped) {
+    if (!root.opened) return
+    root.opened = false
+
+    if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
+    if (root.service && typeof root.service.breakFinished === "function") root.service.breakFinished(skipped === true)
+  }
+
+  function skip() {
+    finish(true)
+  }
+
+  Timer {
+    id: countdown
+    interval: 1000
+    repeat: true
+    running: root.opened
+    onTriggered: {
+      root.secondsLeft = root.secondsLeft - 1
+      if (root.secondsLeft <= 0) root.finish(false)
+    }
+  }
+
+  Variants {
+    model: Quickshell.screens
+
+    PanelWindow {
+      id: breakWindow
+      required property var modelData
+      screen: modelData
+      visible: root.opened
+
+      anchors { top: true; bottom: true; left: true; right: true }
+      color: "transparent"
+
+      WlrLayershell.namespace: "restreminder-break"
+      WlrLayershell.layer: WlrLayer.Overlay
+      // The break has to swallow input: keystrokes must not land in whatever
+      // was focused, and the user must not be able to keep working under it.
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+      exclusionMode: ExclusionMode.Ignore
+
+      // Focus is per-window: the key catcher lives inside this delegate, one
+      // copy per output, so the outer scope cannot reach it.
+      onVisibleChanged: if (visible) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+
+      Rectangle {
+        anchors.fill: parent
+        color: Color.background
+        opacity: 1.0
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        // Swallow clicks rather than act on them: a stray click during a break
+        // should not cut it short.
+        onClicked: {}
+      }
+
+      Item {
+        id: keyCatcher
+        anchors.fill: parent
+        focus: true
+
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) {
+            root.skip()
+            event.accepted = true
+          }
+        }
+      }
+
+      Column {
+        anchors.centerIn: parent
+        spacing: Style.space(24)
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.headline
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.displayLarge
+          textFormat: Text.PlainText
+        }
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: String(root.secondsLeft)
+          color: Color.accent
+          font.family: Style.font.family
+          font.pixelSize: Style.font.displayLarge * 4
+          textFormat: Text.PlainText
+        }
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.subtitle
+          color: Color.foreground
+          opacity: 0.66
+          font.family: Style.font.family
+          font.pixelSize: Style.font.heading
+          textFormat: Text.PlainText
+        }
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: "Esc to skip"
+          color: Color.foreground
+          opacity: 0.4
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          textFormat: Text.PlainText
+        }
+      }
+    }
+  }
+}
