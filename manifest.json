@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "camilo.restreminder",
+  "name": "Rest Reminder",
+  "version": "0.1.0",
+  "author": "Camilo Luna",
+  "description": "20-20-20 eye break reminders: a fullscreen break screen every 20 minutes",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
