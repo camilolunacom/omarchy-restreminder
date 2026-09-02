@@ -329,7 +329,15 @@ Item {
     }
 
     root.awayMonitor = awayMonitorComponent.createObject(root, { timeout: root.idleTimeoutSeconds })
-    if (!root.awayMonitor) logEvent("idle-monitor-failed", "could not create the idle monitor")
+    if (!root.awayMonitor) {
+      logEvent("idle-monitor-failed", "could not create the idle monitor")
+      return
+    }
+
+    // A fresh monitor starts out not-idle and reports no transition, so a
+    // rebuild while suspended would strand the timer with nothing to restart
+    // it.
+    if (root.suspended && root.awayMonitor.isIdle !== true) root.resume("idle monitor rebuilt")
   }
 
   onIdleTimeoutSecondsChanged: if (root.started) rebuildAwayMonitor()
