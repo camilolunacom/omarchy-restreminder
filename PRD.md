@@ -75,6 +75,13 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 
 - FR15: Pressing Esc dismisses the overlay and restarts the work timer. A break is advisory, not enforced.
 
+### 5.4a Sound
+
+- FR15a: A sound plays when a break ends. Sound is the only channel that reaches someone who is doing exactly what the break asked and looking somewhere else, and while the break screen announces its own arrival, nothing else announces that it is safe to look back.
+- FR15b: It rings only for a break that ran its course. A skipped break means the user was looking at the screen and pressed Esc, so they already know.
+- FR15c: `breakEndSound` turns it off, and `breakEndSoundFile` chooses the sound. The default is the freedesktop theme's `complete.oga`, the standard "a task finished" event; Omarchy ships no sounds of its own.
+- FR15d: Playback is `pw-play`, because PipeWire is a dependency of Omarchy itself and so is the one player guaranteed to be present. The sound file is not guaranteed: `sound-theme-freedesktop` is only ever pulled in as another package's dependency. A missing player or file therefore degrades to silence and to a single log line, never to an error every twenty minutes.
+
 ### 5.5 Deferral: idle, inhibitors, fullscreen
 
 - FR16: Once the user has been idle for longer than `idlePauseMinutes`, the work timer is suspended and no break fires. Being away from the screen is already a break. `idlePauseMinutes` defaults to the current value of `workMinutes`, so lowering the work interval lowers the idle threshold with it unless the user sets it explicitly.
@@ -100,14 +107,15 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
       "breakSeconds": 20,
       "warningSeconds": 10,
       "breakHeadline": "Look 20 feet away",
-      "breakMessage": "Rest your eyes on something far off, at least 20 feet away"
+      "breakMessage": "Rest your eyes on something far off, at least 20 feet away",
+      "breakEndSound": true
     }
   ]
 }
 ```
 
 - FR25: `idlePauseMinutes` is optional and omitted from the example above on purpose: it tracks `workMinutes` unless the user sets it, and is only worth setting to decouple the two.
-- FR26: Missing or invalid values fall back to the defaults (20 / 20 / 10, `workMinutes` for `idlePauseMinutes`, and the 20-20-20 wording for the two break strings) instead of breaking the shell. A blank string counts as missing: it is a typo, not an intent to blank the break screen.
+- FR26: Missing or invalid values fall back to the defaults (20 / 20 / 10, `workMinutes` for `idlePauseMinutes`, the 20-20-20 wording for the two break strings, and the sound on) instead of breaking the shell. A blank string counts as missing: it is a typo, not an intent to blank the break screen. Only a real boolean counts as a boolean, for the same reason: `"false"` is a mistake in shell.json, and guessing what it meant is worse than falling back.
 - FR27: Saving `shell.json` applies the new values without restarting the shell (the shell already hot-reloads it); a change to the interval takes effect on the next timer cycle. Rewording the break screen is not a change to the interval and must not restart the cycle: only the timing values are compared when deciding to reschedule.
 
 ### 5.7 Manual control

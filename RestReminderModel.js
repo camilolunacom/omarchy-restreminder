@@ -13,6 +13,13 @@ var DEFAULT_WARNING_SECONDS = 10
 // state and the control that caused it read as one thing.
 var PAUSE_GLYPH = "󰏤"
 
+// The freedesktop sound theme's "a task finished" event, which is exactly
+// what the end of a break is. Omarchy ships no sounds of its own, and
+// sound-theme-freedesktop is only ever pulled in as somebody else's
+// dependency, so this file is not guaranteed to exist -- see the service,
+// which degrades to silence rather than to an error every twenty minutes.
+var DEFAULT_BREAK_END_SOUND_FILE = "/usr/share/sounds/freedesktop/stereo/complete.oga"
+
 var DEFAULT_BREAK_HEADLINE = "Look 20 feet away"
 var DEFAULT_BREAK_MESSAGE = "Rest your eyes on something far off, at least 20 feet away"
 
@@ -24,6 +31,12 @@ function positiveNumber(value, fallback) {
 function nonNegativeNumber(value, fallback) {
   var n = Number(value)
   return isFinite(n) && n >= 0 ? n : fallback
+}
+
+// Only a real boolean counts. A string "false" is a mistake in shell.json, and
+// guessing what it meant is worse than falling back to the default.
+function boolean(value, fallback) {
+  return value === true || value === false ? value : fallback
 }
 
 // An empty string is a typo, not an intent to blank the break screen; only a
@@ -94,7 +107,9 @@ function settingsFrom(shellConfig, pluginId) {
     warningSeconds: warningSeconds,
     idlePauseMinutes: idlePauseMinutes,
     breakHeadline: nonEmptyString(entry.breakHeadline, DEFAULT_BREAK_HEADLINE),
-    breakMessage: nonEmptyString(entry.breakMessage, DEFAULT_BREAK_MESSAGE)
+    breakMessage: nonEmptyString(entry.breakMessage, DEFAULT_BREAK_MESSAGE),
+    breakEndSound: boolean(entry.breakEndSound, true),
+    breakEndSoundFile: nonEmptyString(entry.breakEndSoundFile, DEFAULT_BREAK_END_SOUND_FILE)
   }
 }
 
@@ -209,6 +224,7 @@ if (typeof module !== "undefined") {
     DEFAULT_BREAK_SECONDS: DEFAULT_BREAK_SECONDS,
     DEFAULT_WARNING_SECONDS: DEFAULT_WARNING_SECONDS,
     PAUSE_GLYPH: PAUSE_GLYPH,
+    DEFAULT_BREAK_END_SOUND_FILE: DEFAULT_BREAK_END_SOUND_FILE,
     DEFAULT_BREAK_HEADLINE: DEFAULT_BREAK_HEADLINE,
     DEFAULT_BREAK_MESSAGE: DEFAULT_BREAK_MESSAGE,
     entryFor: entryFor,

@@ -54,7 +54,8 @@ widget is on the bar, and in `plugins[]` when it is not:
   "breakSeconds": 20,
   "warningSeconds": 10,
   "breakHeadline": "Look 20 feet away",
-  "breakMessage": "Rest your eyes on something far off, at least 20 feet away"
+  "breakMessage": "Rest your eyes on something far off, at least 20 feet away",
+  "breakEndSound": true
 }
 ```
 
@@ -66,6 +67,8 @@ widget is on the bar, and in `plugins[]` when it is not:
 | `idlePauseMinutes` | `workMinutes`                                                 | Time away from the keyboard that counts as having taken the break   |
 | `breakHeadline`    | `Look 20 feet away`                                           | Big line on the break screen                                        |
 | `breakMessage`     | `Rest your eyes on something far off, at least 20 feet away`  | Line under the countdown                                            |
+| `breakEndSound`    | `true`                                                        | Ring when a break ends; `false` for silence                         |
+| `breakEndSoundFile`| freedesktop `complete.oga`                                    | Which sound to ring                                                 |
 
 Anything missing or malformed falls back to its default rather than breaking
 the shell, and a blank string counts as missing. The two strings are yours to
@@ -94,6 +97,16 @@ interval you were already serving, only the timing values do.
   in the same instant.
 - Being **away** from the keyboard is different, and does restart the
   interval: that one really was a break.
+- **A sound plays when a break ends**, because by then you are doing what the
+  break asked and looking somewhere else, and nothing on screen can tell you it
+  is over. A break you skipped stays silent: you were looking at it.
+
+The sound is played with `pw-play`, which comes with PipeWire and so is always
+there on Omarchy. The default sound is not: it is the freedesktop theme's
+`complete.oga`, from `sound-theme-freedesktop`, which a minimal install need
+not have. If it is missing you get silence and one line in the log rather than
+an error every twenty minutes — install the package, point `breakEndSoundFile`
+at a file you do have, or set `breakEndSound` to `false`.
 
 Everything is scriptable through the shell's IPC, which is what a Hyprland
 keybinding would call:

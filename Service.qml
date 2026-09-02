@@ -130,11 +130,43 @@ Item {
   }
 
   // Called by the overlay when the countdown runs out or the user presses Esc.
+  //
+  // A break that ran its course rings; a skipped one does not. Skipping means
+  // the user was looking at the screen and pressed Esc, so they already know.
   function breakFinished(skipped) {
     if (!root.breaking) return
     root.breaking = false
     logEvent("break-end", skipped === true ? "skipped" : "completed")
+    if (skipped !== true) playBreakEndSound()
     scheduleNextBreak("after-break")
+  }
+
+  // Sound is the only channel that reaches someone who is doing exactly what
+  // the break asked and looking somewhere else. It rings at the end rather
+  // than at the start: the break screen announces itself, but nothing
+  // announces that it is safe to look back.
+  function playBreakEndSound() {
+    if (!root.settings.breakEndSound) return
+    if (breakEndChime.running) return
+    breakEndChime.running = true
+  }
+
+  // pw-play, because PipeWire is a dependency of Omarchy itself and so is the
+  // one player guaranteed to be there. The sound file is not: it comes from
+  // sound-theme-freedesktop, which a minimal install need not have. A missing
+  // player or file therefore has to degrade to silence, and to one log line
+  // rather than one per break for the life of the session.
+  property bool soundFailed: false
+
+  Process {
+    id: breakEndChime
+    command: ["pw-play", root.settings.breakEndSoundFile]
+    onExited: function(exitCode) {
+      if (exitCode === 0 || root.soundFailed) return
+      root.soundFailed = true
+      logEvent("sound-failed", "could not play " + root.settings.breakEndSoundFile
+        + "; set breakEndSound to false to stop trying")
+    }
   }
 
   // One action for both sides of a break starting: mid-break it ends the
@@ -297,6 +329,7 @@ Item {
       pausedUntil: root.pausedUntil,
       pausedRemaining: root.pausedRemaining,
       settings: root.settings,
+      soundFailed: root.soundFailed,
       lastEvent: root.lastEvent,
       lastEventAt: root.lastEventAt
     })
