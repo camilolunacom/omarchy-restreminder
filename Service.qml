@@ -72,9 +72,18 @@ Item {
   property string lastEvent: "starting"
   property string lastEventAt: ""
 
-  readonly property int secondsToBreak: root.nextBreakAt > 0
-    ? Math.max(0, Math.round((root.nextBreakAt - Date.now()) / 1000))
-    : -1
+  // Maintained by the tick rather than derived from nextBreakAt: Date.now()
+  // emits no change signal, so a computed countdown would never update
+  // anything bound to it -- the bar widget included. -1 means "not counting".
+  property int secondsToBreak: -1
+
+  // The one place the visible state is named. The widget renders off this and
+  // the status IPC reports it, so they can never disagree.
+  readonly property string stateName: root.breaking ? "breaking"
+    : root.paused ? "paused"
+    : root.suspended ? "idle"
+    : root.breakPending ? "deferred"
+    : "counting"
 
   function logEvent(event, details) {
     var suffix = details === undefined || details === null || details === "" ? "" : ": " + String(details)
@@ -85,6 +94,7 @@ Item {
 
   function scheduleNextBreak(reason) {
     root.nextBreakAt = Date.now() + root.settings.workMinutes * 60000
+    root.secondsToBreak = Math.round(root.settings.workMinutes * 60)
     logEvent("cycle-start", (reason || "scheduled") + " work=" + root.settings.workMinutes + "m break=" + root.settings.breakSeconds + "s")
   }
 
@@ -197,11 +207,7 @@ Item {
 
   function statusJson() {
     return JSON.stringify({
-      state: root.breaking ? "breaking"
-        : root.paused ? "paused"
-        : root.suspended ? "idle"
-        : root.breakPending ? "deferred"
-        : "counting",
+      state: root.stateName,
       secondsToBreak: root.secondsToBreak,
       warningSecondsLeft: root.warningSecondsLeft,
       breaking: root.breaking,
@@ -222,15 +228,25 @@ Item {
 
   function tick() {
     expirePauseIfDue()
-    if (root.paused) return
-    if (root.breaking || root.suspended) return
+
+    if (root.paused || root.breaking || root.suspended) {
+      root.secondsToBreak = -1
+      return
+    }
+
     if (root.breakPending) {
+      root.secondsToBreak = -1
       if (!root.deferring) releaseDeferredBreak()
       return
     }
-    if (root.nextBreakAt <= 0) return
 
-    var secondsLeft = Math.ceil((root.nextBreakAt - Date.now()) / 1000)
+    if (root.nextBreakAt <= 0) {
+      root.secondsToBreak = -1
+      return
+    }
+
+    var secondsLeft = Math.max(0, Math.ceil((root.nextBreakAt - Date.now()) / 1000))
+    root.secondsToBreak = secondsLeft
     updateWarning(secondsLeft)
 
     if (secondsLeft > 0) return

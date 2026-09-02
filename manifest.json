@@ -7,11 +7,20 @@
   "description": "20-20-20 eye break reminders: a fullscreen break screen every 20 minutes",
   "kinds": [
     "service",
-    "overlay"
+    "overlay",
+    "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml",
-    "overlay": "BreakOverlay.qml"
+    "overlay": "BreakOverlay.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Rest Reminder",
+    "description": "Countdown to the next eye break",
+    "category": "Health",
+    "allowMultiple": false,
+    "defaultSection": "right"
   }
 }
