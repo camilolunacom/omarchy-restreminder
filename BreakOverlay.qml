@@ -20,7 +20,7 @@ Item {
 
   readonly property string pluginId: manifest && manifest.id
     ? String(manifest.id)
-    : "camilo.restreminder"
+    : "io.github.camilolunacom.restreminder"
 
   property bool opened: false
   property int totalSeconds: 20

@@ -14,11 +14,30 @@ fullscreen.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/omarchy-restreminder.git --enable --yes
+omarchy plugin add https://github.com/camilolunacom/omarchy-restreminder.git --enable --yes
 ```
 
 That places the countdown widget on the right of the bar and starts the timer.
-Nothing else to configure.
+Nothing else to configure. There are no dependencies beyond Omarchy itself:
+everything runs inside `omarchy-shell`, and nothing is compiled or downloaded
+at install time.
+
+## Uninstall
+
+```bash
+omarchy plugin remove io.github.camilolunacom.restreminder
+```
+
+That takes the widget off the bar, stops the timer, and deletes the checkout.
+The plugin writes exactly two things outside its own directory, both safe to
+leave and both listed here so you can be sure:
+
+- its entry in `~/.config/omarchy/shell.json`, which `omarchy plugin remove`
+  takes with it
+- `~/.local/state/omarchy/restreminder`, one line holding a timed pause, if you
+  ever set one: `rm -f ~/.local/state/omarchy/restreminder`
+
+It never edits any other part of your configuration.
 
 ## Settings
 
@@ -28,7 +47,7 @@ widget is on the bar, and in `plugins[]` when it is not:
 
 ```json
 {
-  "id": "camilo.restreminder",
+  "id": "io.github.camilolunacom.restreminder",
   "workMinutes": 20,
   "breakSeconds": 20,
   "warningSeconds": 10,
@@ -95,10 +114,10 @@ At most one break is ever owed, however long the wait was.
 
 ## Hacking on it
 
-The plugin is a plain git checkout in `~/.config/omarchy/plugins/camilo.restreminder/`.
+The plugin is a plain git checkout in `~/.config/omarchy/plugins/io.github.camilolunacom.restreminder/`.
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/camilo.restreminder
+omarchy plugin validate ~/.config/omarchy/plugins/io.github.camilolunacom.restreminder
 omarchy restart shell
 journalctl -t omarchy-shell -f | grep restreminder
 ```
@@ -124,3 +143,7 @@ Two things that cost time here, worth knowing before they cost you the same:
 | `BarWidget.qml`         | The countdown widget and its popup                           |
 | `RestReminderModel.js`  | Pure helpers: settings parsing, label formatting             |
 | `PRD.md`                | What this is meant to do, and why                            |
+
+## License
+
+[MIT](LICENSE).

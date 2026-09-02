@@ -20,7 +20,7 @@ Item {
 
   readonly property string pluginId: manifest && manifest.id
     ? String(manifest.id)
-    : "camilo.restreminder"
+    : "io.github.camilolunacom.restreminder"
 
   // Re-evaluated whenever the shell reloads shell.json, which is what makes
   // an edited interval take effect without a restart.

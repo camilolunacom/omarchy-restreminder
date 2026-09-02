@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "camilo.restreminder",
+  "id": "io.github.camilolunacom.restreminder",
   "name": "Rest Reminder",
   "version": "0.1.0",
   "author": "Camilo Luna",

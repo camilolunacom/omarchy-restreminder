@@ -4,7 +4,7 @@
 **Author:** Camilo Luna
 **Date:** 2026-09-02
 **Target platform:** Omarchy 4.x (`omarchy-shell` / Quickshell plugin host)
-**Plugin id:** `<user>.restreminder` (e.g. `camilo.restreminder`) — repo `omarchy-restreminder`
+**Plugin id:** `io.github.camilolunacom.restreminder` — repo `omarchy-restreminder`
 
 ## 1. Summary
 
@@ -95,7 +95,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
   "version": 1,
   "plugins": [
     {
-      "id": "camilo.restreminder",
+      "id": "io.github.camilolunacom.restreminder",
       "workMinutes": 20,
       "breakSeconds": 20,
       "warningSeconds": 10,
@@ -114,7 +114,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 
 - FR28: The service registers its own IPC target, `restreminder`, exposing `breakNow`, `skip`, `pause`, `resume` and `status`. It is in the MVP even though the CLI is not: it is a handful of lines, it makes the plugin drivable from a Hyprland keybinding on day one, and it is the surface the post-MVP CLI wraps unchanged.
 - FR29: A pause with an expiry is persisted to `~/.local/state/omarchy/restreminder`, with an absolute wake time, and survives a shell restart. An indefinite pause is session state and is dropped on restart. Shell restarts are not rare — `omarchy update`, a font change, and `omarchy refresh shell` all trigger one — so a timed pause that silently expired early would be a bug, while a forgotten indefinite pause that survived forever would quietly defeat the plugin.
-- FR30: The generic overlay calls keep working as a fallback: `omarchy-shell shell summon camilo.restreminder '{}'` to take a break now, `omarchy-shell shell hide camilo.restreminder` to dismiss.
+- FR30: The generic overlay calls keep working as a fallback: `omarchy-shell shell summon io.github.camilolunacom.restreminder '{}'` to take a break now, `omarchy-shell shell hide io.github.camilolunacom.restreminder` to dismiss.
 
 ### 5.8 Bar widget
 
@@ -122,7 +122,7 @@ Single user: an Omarchy desktop user who works long sessions at the keyboard.
 - FR32: The widget renders the current state distinctly: counting down, deferred by fullscreen, suspended by idle, or paused by the user.
 - FR33: Clicking the widget opens a popup: the countdown to the minute and second, the current state in words, and buttons to skip and to pause or resume. Clicking a countdown asks how long exactly, which the bar slot has no room to answer. Right click pauses and resumes without opening the popup, and middle click takes a break immediately.
 - FR33a: Skip means "the next break is a full work interval away" on both sides of a break starting: during a break it ends the break, otherwise it drops the break that is coming. It is inert while paused or away, where nothing is owed, and the button says so by going dim rather than by failing silently.
-- FR34: The widget is a view, not a second source of truth. It reads state from the resident service through `shell.serviceFor("camilo.restreminder")` and holds no timer or settings of its own. There is one entry in shell.json, never two.
+- FR34: The widget is a view, not a second source of truth. It reads state from the resident service through `shell.serviceFor("io.github.camilolunacom.restreminder")` and holds no timer or settings of its own. There is one entry in shell.json, never two.
 - FR35: The manifest sets `barWidget.defaultSection`, so enabling the plugin places the widget on the bar automatically. No manual `omarchy bar move` is needed to see it.
 - FR36: The widget is optional. Removing it from the bar must not stop the timer or affect breaks in any way.
 

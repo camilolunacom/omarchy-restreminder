@@ -14,7 +14,7 @@ import "RestReminderModel.js" as Model
 // worth reaching for at that moment.
 Panel {
   id: root
-  moduleName: "camilo.restreminder"
+  moduleName: "io.github.camilolunacom.restreminder"
   // Short on purpose: the plugin id is the marketplace's permanent
   // identifier, not something anyone should have to type at a prompt.
   ipcTarget: "restreminder-popup"
