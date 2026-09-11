@@ -22,10 +22,31 @@ Item {
     ? String(manifest.id)
     : "io.github.camilolunacom.restreminder"
 
-  // Re-evaluated whenever the shell reloads shell.json, which is what makes
-  // an edited interval take effect without a restart.
-  readonly property var settings: Model.settingsFrom(
-    shell && shell.shellConfig ? shell.shellConfig : null, root.pluginId)
+  // Third-party services receive PluginShellApi, which does not expose
+  // shellConfig. Watch the same user file as the host instead.
+  property var userConfig: ({})
+  readonly property var settings: Model.settingsFrom(root.userConfig, root.pluginId)
+
+  FileView {
+    id: settingsFile
+    path: root.home + "/.config/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      try {
+        var parsed = JSON.parse(text())
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+          throw new Error("expected a JSON object")
+        root.userConfig = parsed
+      } catch (error) {
+        console.warn("restreminder config: keeping previous settings: " + error)
+      }
+    }
+    onLoadFailed: function(error) {
+      console.warn("restreminder config: could not read shell.json: " + error)
+    }
+  }
 
   // Epoch milliseconds. 0 means no cycle is scheduled.
   property double nextBreakAt: 0
