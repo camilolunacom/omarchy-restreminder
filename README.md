@@ -169,6 +169,16 @@ Two things that cost time here, worth knowing before they cost you the same:
 | `RestReminderModel.js`  | Pure helpers: settings parsing, label formatting             |
 | `PRD.md`                | What this is meant to do, and why                            |
 
+### Configuration compatibility
+
+The service reads and watches `~/.config/omarchy/shell.json` directly. This
+works with Omarchy's scoped `PluginShellApi`, which does not expose the host's
+`shellConfig`. Valid edits apply without restarting the shell. Unreadable or
+invalid JSON logs a warning and retains the last valid settings while the
+service remains loaded (plugin defaults at startup). The host may itself unload
+third-party plugins when its config is invalid; this reader cannot prevent
+that. Settings still belong inline on the plugin entry shown above.
+
 ## License
 
 [MIT](LICENSE).
