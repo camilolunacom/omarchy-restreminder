@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import "RestReminderModel.js" as Model
 
 // The break screen.
@@ -120,15 +121,15 @@ Item {
         implicitWidth: warningText.implicitWidth + Style.space(32)
         implicitHeight: warningText.implicitHeight + Style.space(20)
         radius: Style.cornerRadius
-        color: Color.popups.background
+        color: Commons.Color.popups.background
         border.width: Math.max(1, Style.space(1))
-        border.color: Color.popups.border
+        border.color: Commons.Color.popups.border
 
         Text {
           id: warningText
           anchors.centerIn: parent
           text: "Eye break in " + root.warningSecondsLeft + "s"
-          color: Color.popups.text
+          color: Commons.Color.popups.text
           font.family: Style.font.family
           font.pixelSize: Style.font.subtitle
           textFormat: Text.PlainText
@@ -162,7 +163,7 @@ Item {
 
       Rectangle {
         anchors.fill: parent
-        color: Color.background
+        color: Commons.Color.background
         opacity: 1.0
       }
 
@@ -198,7 +199,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.WordWrap
           text: root.headline
-          color: Color.foreground
+          color: Commons.Color.foreground
           font.family: Style.font.family
           font.pixelSize: Style.font.displayLarge
           textFormat: Text.PlainText
@@ -207,7 +208,7 @@ Item {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: String(root.secondsLeft)
-          color: Color.accent
+          color: Commons.Color.accent
           font.family: Style.font.family
           font.pixelSize: Style.font.displayLarge * 4
           textFormat: Text.PlainText
@@ -219,7 +220,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.WordWrap
           text: root.subtitle
-          color: Color.foreground
+          color: Commons.Color.foreground
           opacity: 0.66
           font.family: Style.font.family
           font.pixelSize: Style.font.heading
@@ -229,7 +230,7 @@ Item {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: "Esc to skip"
-          color: Color.foreground
+          color: Commons.Color.foreground
           opacity: 0.4
           font.family: Style.font.family
           font.pixelSize: Style.font.body

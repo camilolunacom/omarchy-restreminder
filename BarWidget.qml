@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "RestReminderModel.js" as Model
 
@@ -47,7 +48,7 @@ Panel {
     && root.service
     && root.service.warningSecondsLeft >= 0
 
-  readonly property color foreground: root.bar ? root.bar.foreground : Color.foreground
+  readonly property color foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
   readonly property string fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
   // The label is a text block rather than an icon, so the bar's open-panel
