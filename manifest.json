@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.camilolunacom.restreminder",
   "name": "Rest Reminder",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Camilo Luna",
   "description": "20-20-20 eye break reminders: a fullscreen break screen every 20 minutes",
   "kinds": [

@@ -35,7 +35,7 @@ The plugin writes exactly two things outside its own directory, both safe to
 leave and both listed here so you can be sure:
 
 - its entry in `~/.config/omarchy/shell.json`, which `omarchy plugin remove`
-  takes with it
+  takes with it; on first run it adds `units` there, and nothing else
 - `~/.local/state/omarchy/restreminder`, one line holding a timed pause, if you
   ever set one: `rm -f ~/.local/state/omarchy/restreminder`
 
@@ -53,6 +53,7 @@ widget is on the bar, and in `plugins[]` when it is not:
   "workMinutes": 20,
   "breakSeconds": 20,
   "warningSeconds": 10,
+  "units": "imperial",
   "breakHeadline": "Look 20 feet away",
   "breakMessage": "Rest your eyes on something far off, at least 20 feet away",
   "breakEndSound": true
@@ -65,15 +66,24 @@ widget is on the bar, and in `plugins[]` when it is not:
 | `breakSeconds`     | `20`                                                          | How long the break screen stays up                                  |
 | `warningSeconds`   | `10`                                                          | Heads-up before the break; `0` turns it off                         |
 | `idlePauseMinutes` | `workMinutes`                                                 | Time away from the keyboard that counts as having taken the break   |
-| `breakHeadline`    | `Look 20 feet away`                                           | Big line on the break screen                                        |
-| `breakMessage`     | `Rest your eyes on something far off, at least 20 feet away`  | Line under the countdown                                            |
+| `units`            | from your locale                                              | `metric` (6 metres) or `imperial` (20 feet) for the default wording |
+| `breakHeadline`    | `Look 20 feet away` / `Look 6 metres away`                    | Big line on the break screen                                        |
+| `breakMessage`     | `…at least 20 feet away` / `…at least 6 metres away`          | Line under the countdown                                            |
 | `breakEndSound`    | `true`                                                        | Ring when a break ends; `false` for silence                         |
 | `breakEndSoundFile`| freedesktop `complete.oga`                                    | Which sound to ring                                                 |
 
 Anything missing or malformed falls back to its default rather than breaking
 the shell, and a blank string counts as missing. The two strings are yours to
-reword, translate, or put in metres; changing them does not restart the
-interval you were already serving, only the timing values do.
+reword or translate; changing them does not restart the interval you were
+already serving, only the timing values do.
+
+`units` only picks the default wording, so it has no effect once you set your
+own `breakHeadline` or `breakMessage`. On first run, when the entry has no
+`units` yet, the plugin reads your locale's measurement system
+(`LC_MEASUREMENT`) and writes the result into the entry: `imperial` for US
+customary locales, `metric` for everyone else, Britain included. After that
+it is an ordinary setting; change it and the plugin leaves it alone. A
+misspelled value is never overwritten, it just falls back to the locale.
 
 ## Using it
 

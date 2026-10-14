@@ -20,8 +20,22 @@ var PAUSE_GLYPH = "󰏤"
 // which degrades to silence rather than to an error every twenty minutes.
 var DEFAULT_BREAK_END_SOUND_FILE = "/usr/share/sounds/freedesktop/stereo/complete.oga"
 
-var DEFAULT_BREAK_HEADLINE = "Look 20 feet away"
-var DEFAULT_BREAK_MESSAGE = "Rest your eyes on something far off, at least 20 feet away"
+// The same rule in metres is 6, not a literal 6.096: the number has to be
+// one a tired user can picture at a glance.
+var BREAK_TEXT = {
+  imperial: {
+    headline: "Look 20 feet away",
+    message: "Rest your eyes on something far off, at least 20 feet away"
+  },
+  metric: {
+    headline: "Look 6 metres away",
+    message: "Rest your eyes on something far off, at least 6 metres away"
+  }
+}
+
+var DEFAULT_UNITS = "imperial"
+var DEFAULT_BREAK_HEADLINE = BREAK_TEXT[DEFAULT_UNITS].headline
+var DEFAULT_BREAK_MESSAGE = BREAK_TEXT[DEFAULT_UNITS].message
 
 function positiveNumber(value, fallback) {
   var n = Number(value)
@@ -45,6 +59,19 @@ function nonEmptyString(value, fallback) {
   if (typeof value !== "string") return fallback
   var trimmed = value.trim()
   return trimmed === "" ? fallback : trimmed
+}
+
+// "metric" or "imperial", or null for anything else, so a typo falls back
+// rather than picking a side.
+function unitsValue(value) {
+  return value === "metric" || value === "imperial" ? value : null
+}
+
+// Feet only where the locale measures in US customary units. Qt reports
+// en_GB as "Imperial UK", but distances on a break screen read naturally in
+// metres there too, so it goes with the rest of the world.
+function unitsForLocale(isImperialUS) {
+  return isImperialUS ? "imperial" : "metric"
 }
 
 function findInList(list, pluginId) {
@@ -85,8 +112,14 @@ function entryFor(shellConfig, pluginId) {
 
 // Every value falls back rather than throwing: a typo in shell.json must not
 // take the shell down with it.
-function settingsFrom(shellConfig, pluginId) {
+//
+// `fallbackUnits` stands in for a missing or malformed `units`: the service
+// passes the one it detected from the locale.
+function settingsFrom(shellConfig, pluginId, fallbackUnits) {
   var entry = entryFor(shellConfig, pluginId) || {}
+
+  var units = unitsValue(entry.units) || unitsValue(fallbackUnits) || DEFAULT_UNITS
+  var breakText = BREAK_TEXT[units]
 
   var workMinutes = positiveNumber(entry.workMinutes, DEFAULT_WORK_MINUTES)
   var breakSeconds = positiveNumber(entry.breakSeconds, DEFAULT_BREAK_SECONDS)
@@ -106,11 +139,29 @@ function settingsFrom(shellConfig, pluginId) {
     breakSeconds: breakSeconds,
     warningSeconds: warningSeconds,
     idlePauseMinutes: idlePauseMinutes,
-    breakHeadline: nonEmptyString(entry.breakHeadline, DEFAULT_BREAK_HEADLINE),
-    breakMessage: nonEmptyString(entry.breakMessage, DEFAULT_BREAK_MESSAGE),
+    units: units,
+    breakHeadline: nonEmptyString(entry.breakHeadline, breakText.headline),
+    breakMessage: nonEmptyString(entry.breakMessage, breakText.message),
     breakEndSound: boolean(entry.breakEndSound, true),
     breakEndSoundFile: nonEmptyString(entry.breakEndSoundFile, DEFAULT_BREAK_END_SOUND_FILE)
   }
+}
+
+// The plugin's entry with `units` added, for writing back on first run, or
+// null when there is nothing to write: no entry to put it on yet, or `units`
+// already present. A present but malformed value is the user's to fix; it is
+// left alone rather than silently overwritten.
+//
+// The shell replaces the whole entry on write, so the copy carries every
+// other setting along with it.
+function entryWithUnits(shellConfig, pluginId, units) {
+  var entry = entryFor(shellConfig, pluginId)
+  if (!entry || entry.units !== undefined || !unitsValue(units)) return null
+
+  var next = {}
+  for (var key in entry) next[key] = entry[key]
+  next.units = units
+  return next
 }
 
 // Timing only, on purpose. This is what decides whether an edit to shell.json
@@ -227,8 +278,12 @@ if (typeof module !== "undefined") {
     DEFAULT_BREAK_END_SOUND_FILE: DEFAULT_BREAK_END_SOUND_FILE,
     DEFAULT_BREAK_HEADLINE: DEFAULT_BREAK_HEADLINE,
     DEFAULT_BREAK_MESSAGE: DEFAULT_BREAK_MESSAGE,
+    BREAK_TEXT: BREAK_TEXT,
+    unitsValue: unitsValue,
+    unitsForLocale: unitsForLocale,
     entryFor: entryFor,
     settingsFrom: settingsFrom,
+    entryWithUnits: entryWithUnits,
     sameSettings: sameSettings,
     storedPause: storedPause,
     formatCountdown: formatCountdown,
