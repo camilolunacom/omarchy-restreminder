@@ -22,10 +22,52 @@ Item {
     ? String(manifest.id)
     : "io.github.camilolunacom.restreminder"
 
-  // Re-evaluated whenever the shell reloads shell.json, which is what makes
-  // an edited interval take effect without a restart.
+  // Third-party services receive PluginShellApi, which does not expose
+  // shellConfig. Watch the same user file as the host instead.
+  property var userConfig: ({})
   readonly property var settings: Model.settingsFrom(
-    shell && shell.shellConfig ? shell.shellConfig : null, root.pluginId)
+    root.userConfig, root.pluginId, root.localeUnits)
+
+  // Feet or metres from LC_MEASUREMENT, used until shell.json says otherwise.
+  readonly property string localeUnits: Model.unitsForLocale(
+    Qt.locale().measurementSystem === Locale.ImperialUSSystem)
+
+  // On first run there is no `units` in shell.json yet: write the detected
+  // one there, so the choice is visible and the user can flip it. Tried once
+  // a session; if the shell refuses, the in-memory fallback still applies.
+  property bool unitsPersistAttempted: false
+
+  function persistDetectedUnits() {
+    if (root.unitsPersistAttempted) return
+    var next = Model.entryWithUnits(root.userConfig, root.pluginId, root.localeUnits)
+    if (!next) return
+    root.unitsPersistAttempted = true
+    if (!root.shell || typeof root.shell.updateEntryInline !== "function") return
+    if (root.shell.updateEntryInline(root.pluginId, next))
+      logEvent("units-detected", root.localeUnits + " from locale")
+  }
+
+  FileView {
+    id: settingsFile
+    path: root.home + "/.config/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      try {
+        var parsed = JSON.parse(text())
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+          throw new Error("expected a JSON object")
+        root.userConfig = parsed
+        root.persistDetectedUnits()
+      } catch (error) {
+        console.warn("restreminder config: keeping previous settings: " + error)
+      }
+    }
+    onLoadFailed: function(error) {
+      console.warn("restreminder config: could not read shell.json: " + error)
+    }
+  }
 
   // Epoch milliseconds. 0 means no cycle is scheduled.
   property double nextBreakAt: 0
